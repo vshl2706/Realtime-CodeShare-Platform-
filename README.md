@@ -103,6 +103,8 @@ yarn add @lezer/highlight @codemirror/language
 yarn add @codemirror/lang-html
 yarn add -D nodemon
 yarn add express socket.io socket.io-client
+yarn add react-icons
+
 <!-- We are adding avatar dependencies to add avatar. -->
 
 <!-- Some Good CSS classes
