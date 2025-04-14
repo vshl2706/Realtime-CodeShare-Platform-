@@ -1,62 +1,58 @@
 import React, { useEffect, useRef } from 'react';
-
-// Essential core setup
-import {EditorState} from "@codemirror/state"
+import { EditorState } from "@codemirror/state";
 import {
   EditorView, keymap, highlightSpecialChars, drawSelection,
   highlightActiveLine, dropCursor, rectangularSelection,
   crosshairCursor, lineNumbers, highlightActiveLineGutter
-} from "@codemirror/view"
+} from "@codemirror/view";
 import {
   defaultHighlightStyle, syntaxHighlighting, indentOnInput,
   bracketMatching, foldGutter, foldKeymap
-} from "@codemirror/language"
+} from "@codemirror/language";
 import {
-  defaultKeymap, history, historyKeymap
-} from "@codemirror/commands"
+  defaultKeymap, historyKeymap, indentWithTab
+} from "@codemirror/commands";
 import {
   searchKeymap, highlightSelectionMatches
-} from "@codemirror/search"
+} from "@codemirror/search";
 import {
   autocompletion, completionKeymap, closeBrackets,
   closeBracketsKeymap
-} from "@codemirror/autocomplete"
-import {lintKeymap} from "@codemirror/lint"
+} from "@codemirror/autocomplete";
+import { lintKeymap } from "@codemirror/lint";
 import { oneDark } from '@codemirror/theme-one-dark';
-import {javascript} from "@codemirror/lang-javascript";
-import {tags} from "@lezer/highlight"
-import {HighlightStyle} from "@codemirror/language"
-import {indentWithTab} from "@codemirror/commands"
+import { javascript } from "@codemirror/lang-javascript";
+import { tags } from "@lezer/highlight";
+import { HighlightStyle } from "@codemirror/language";
+import ACTIONS from '../Actions';
 
-
-const Editor = () => {
+const Editor = ({ socketRef, roomId }) => {
   const editorRef = useRef(null);
+  const viewRef = useRef(null); // holds CodeMirror view instance
+  const isRemoteUpdate = useRef(false); // prevents feedback loop
+
   useEffect(() => {
-    if(!editorRef.current) return;
+    if (!editorRef.current) return;
+
     const fixedHeightEditor = EditorView.theme({
       "&": { height: "500px" },
       ".cm-scroller": { overflow: "auto" },
       ".cm-content": {
-        fontSize: "16px",       // ✅ Increases code size
-        lineHeight: "1.6",      // ✅ Makes code more spacious
-        padding: "16px",        // ✅ Adds inner spacing
+        fontSize: "16px",
+        lineHeight: "1.6",
+        padding: "16px",
       }
     });
+
     const myHighlightStyle = HighlightStyle.define([
       { tag: tags.keyword, color: "#fc6" },
-      { tag: tags.comment, color: "#f5d" , fontStyle: "italic"}
+      { tag: tags.comment, color: "#f5d", fontStyle: "italic" }
     ]);
-    let myTheme = EditorView.theme({
-      "&": {
-        color: "white",
-        backgroundColor: "#034"
-      },
-      ".cm-content": {
-        caretColor: "#0e9"
-      },
-      "&.cm-focused .cm-cursor": {
-        borderLeftColor: "#0e9"
-      },
+
+    const myTheme = EditorView.theme({
+      "&": { color: "white", backgroundColor: "#034" },
+      ".cm-content": { caretColor: "#0e9" },
+      "&.cm-focused .cm-cursor": { borderLeftColor: "#0e9" },
       "&.cm-focused .cm-selectionBackground, ::selection": {
         backgroundColor: "#074"
       },
@@ -65,86 +61,96 @@ const Editor = () => {
         color: "#ddd",
         border: "none"
       }
-    }, {dark: true})
-    const baseTheme = EditorView.baseTheme({
-      ".cm-o-replacement": {
-        display: "inline-block",
-        width: ".5em",
-        height: ".5em",
-        borderRadius: ".25em"
-      },
-      "&light .cm-o-replacement": {
-        backgroundColor: "#04c"
-      },
-      "&dark .cm-o-replacement": {
-        backgroundColor: "#5bf"
-      }
-    })
-    const minHeightEditor = EditorView.theme({
-      ".cm-content, .cm-gutter": {minHeight: "200px"}
-    })
-   
+    }, { dark: true });
 
-    const startState = EditorState.create({
+    const state = EditorState.create({
       doc: "function hello() {\n  console.log('Hello, Vishal!');\n}",
       extensions: [
-        baseTheme,
-        myTheme,
-        minHeightEditor,
-        fixedHeightEditor,
         oneDark,
-
+        myTheme,
+        fixedHeightEditor,
         lineNumbers(),
+        highlightActiveLineGutter(),
         foldGutter(),
         highlightSpecialChars(),
         drawSelection(),
         dropCursor(),
         indentOnInput(),
-        syntaxHighlighting(defaultHighlightStyle),
         bracketMatching(),
         closeBrackets(),
         autocompletion(),
         rectangularSelection(),
         crosshairCursor(),
         highlightActiveLine(),
-        // highlightActiveLineGutter(),
-        keymap.of([indentWithTab]),
-        javascript({typescript: true}),
+        syntaxHighlighting(defaultHighlightStyle),
+        syntaxHighlighting(myHighlightStyle),
+        javascript({ typescript: true }),
         keymap.of([
-          // A large set of basic bindings
+          indentWithTab,
           ...defaultKeymap,
-          // Closed-brackets aware backspace
           ...closeBracketsKeymap,
-          // Search-related keys
           ...searchKeymap,
-          // Redo/undo keys
           ...historyKeymap,
-          // Code folding bindings
           ...foldKeymap,
-          // Autocompletion keys
           ...completionKeymap,
-          // Keys related to the linter system
           ...lintKeymap
-        ])],
+        ]),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged && !isRemoteUpdate.current) {
+            const code = update.state.doc.toString();
+            socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
+              roomId,
+              code,
+            });
+          }
+        })
+      ],
     });
 
     const view = new EditorView({
-      state: startState,
+      state,
       parent: editorRef.current,
     });
 
-    console.log("Code editor initialized");
-    return () => {
-      view.destroy(); // Clean up the editor view on component unmount
-    };
+    viewRef.current = view;
 
+    console.log("✅ CodeMirror 6 editor initialized");
+
+    return () => {
+      view.destroy();
+    };
   }, []);
 
+  useEffect(() => {
+    if (!socketRef.current) return;
+
+    const handleCodeChange = ({ code }) => {
+      const view = viewRef.current;
+      if (!view) return;
+
+      const currentCode = view.state.doc.toString();
+      if (code !== currentCode) {
+        isRemoteUpdate.current = true;
+        view.dispatch({
+          changes: {
+            from: 0,
+            to: currentCode.length,
+            insert: code
+          }
+        });
+        isRemoteUpdate.current = false;
+      }
+    };
+
+    socketRef.current.on(ACTIONS.CODE_CHANGE, handleCodeChange);
+
+    return () => {
+      socketRef.current.off(ACTIONS.CODE_CHANGE, handleCodeChange);
+    };
+  }, [socketRef.current]);
+
   return (
-    <div 
-      ref={editorRef}
-      className="code-editor-container"
-    ></div>
+    <div ref={editorRef} className="code-editor-container" />
   );
 };
 

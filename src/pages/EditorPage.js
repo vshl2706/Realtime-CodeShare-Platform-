@@ -1,13 +1,13 @@
-import React, { useState, useRef, useEffect} from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import Client from '../components/Client';
 import Editor from '../components/Editor';
 import { initSocket } from '../socket';
-import { 
-  useLocation, 
-  useNavigate, 
-  Navigate, 
-  useParams 
+import {
+  useLocation,
+  useNavigate,
+  Navigate,
+  useParams
 } from 'react-router-dom';
 import ACTIONS from '../Actions';
 // console.log("Editor Page mounted");
@@ -19,17 +19,17 @@ const EditorPage = () => {
     // { socketId: 3, userName: 'Nikhil Kumar' },
     // { socketId: 4, userName: 'Shashank Rathore' },
   ]);
-  
+
   const socketRef = useRef(null);
   const location = useLocation();
   const reactNavigator = useNavigate();
-  const {roomId} = useParams();
+  const { roomId } = useParams();
 
   useEffect(() => {
-    const init = async () =>{
+    const init = async () => {
       socketRef.current = await initSocket();
-      socketRef.current.on('connect_error', (err)=>handleErrors(err));
-      socketRef.current.on('connect_failed', (err)=>handleErrors(err));
+      socketRef.current.on('connect_error', (err) => handleErrors(err));
+      socketRef.current.on('connect_failed', (err) => handleErrors(err));
 
       function handleErrors(e) {
         console.log('socket error', e);
@@ -40,31 +40,39 @@ const EditorPage = () => {
       // After creating socket we have to create an event to join event
       socketRef.current.emit(ACTIONS.JOIN, {
         roomId,
-        username: location.state?.username, 
+        username: location.state?.username,
       });
 
       // Listening for joined event
+      // var agents = [];
       socketRef.current.on(
         ACTIONS.JOINED,
-        ({clients, username, socketId}) => {
-          if(username !== location.state?.username){
+        ({ clients, username, socketId }) => {
+          if (socketRef.current.id === socketId) {
+            // It's me — I just joined, no toast
+            console.log("✅ This client just joined");
+          } else {
+            // It's someone else — show toast
             toast.success(`${username} joined the room.`);
             console.log(`${username} joined`);
           }
+      
+          // Always update clients with the fresh full list from server
+          let a = clients.length
+          for(let i = 0; i < a/2; i++) {
+            clients.splice(i,1)
 
-          const uniqueClients = clients.filter(
-            (client, index, self) =>
-              index === self.findIndex((c) => c.username === client.username)
-          );
-          console.log('uniqueClients', uniqueClients);
+          }
+
           setClients(clients);
+          console.log('🔄 Client list updated:', clients);
         }
       );
 
       // Listening for disconnected event
       socketRef.current.on(
         ACTIONS.DISCONNECTED,
-        ({socketId, username}) => {
+        ({ socketId, username }) => {
           toast.success(`${username} left the room.`);
           setClients((prev) => {
             return prev.filter(
@@ -81,16 +89,16 @@ const EditorPage = () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current.off(ACTIONS.JOINED);
-        socketRef.current.off(ACTIONS.DISCONNECTED);  
+        socketRef.current.off(ACTIONS.DISCONNECTED);
       }
     };
 
   }, []);
 
-  if(!location.state){
+  if (!location.state) {
     return <Navigate to="/" />;
   }
-  
+
 
 
   return (
@@ -106,11 +114,13 @@ const EditorPage = () => {
           </div>
           <h3>Connected</h3>
           <div className="clientsList">
+            {console.log(clients)}
             {clients.map((client) => (
               <Client
                 key={client.socketId}
                 username={client.username}
               />
+              // {console.log(clients)}
             ))}
           </div>
         </div>
@@ -127,7 +137,7 @@ const EditorPage = () => {
           </div>
           <div className="cm-content" >
             {/* <!-- The actual document content --> */}
-            <div className="cm-line"><Editor/></div>
+            <div className="cm-line"><Editor socketRef={socketRef} roomId={roomId} /></div>
             <div className="cm-line">...</div>
           </div>
           <div className="cm-selectionLayer">
