@@ -10,7 +10,7 @@ const io = new Server(server, {
     cors: {
         origin: [
             "http://localhost:3000", // ✅ make sure your frontend runs at this URL
-            "https://realtime-codeshare-platform.onrender.com"
+            "https://realtime-code-share-git-e909d6-vishal-singhs-projects-0dfe4517.vercel.app/"
             ],
         methods: ["GET", "POST"]
     }
