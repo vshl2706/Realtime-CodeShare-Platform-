@@ -8,7 +8,10 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:3000", // ✅ make sure your frontend runs at this URL
+        origin: [
+            "http://localhost:3000", // ✅ make sure your frontend runs at this URL
+            "https://realtime-codeshare-platform.onrender.com"
+            ]
         methods: ["GET", "POST"]
     }
 });
