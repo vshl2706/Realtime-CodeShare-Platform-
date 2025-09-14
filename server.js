@@ -11,7 +11,7 @@ const io = new Server(server, {
         origin: [
             "http://localhost:3000", // ✅ make sure your frontend runs at this URL
             "https://realtime-codeshare-platform.onrender.com"
-            ]
+            ],
         methods: ["GET", "POST"]
     }
 });
