@@ -35,10 +35,10 @@ const EditorPage = () => {
         if (socketRef.current.id !== socketId) {
           toast.success(`${username} joined the room.`);
         }
-        let a = clients.length
-        for(let i = 0; i < a/2; i++) {
-          clients.splice(i,1)
-        }
+        // let a = clients.length
+        // for(let i = 0; i < a/2; i++) {
+        //   clients.splice(i,1)
+        // }
         setClients(clients);
       });
 
